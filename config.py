@@ -78,7 +78,7 @@ courses = {
     },
     "course3": {
         "name": "AVITO",
-        "image": os.path.join(BASE_DIR, "images", "ozon.jpg"),
+        "image": os.path.join(BASE_DIR, "images", "avito.jpg"),
         "tariffs": {
             "tariff1": {
                 "name": "Авито Стандарт", 
