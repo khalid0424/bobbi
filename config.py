@@ -7,10 +7,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN = '7558650621:AAHKsjq8FsFoIVj6YoYTnH2zTl0m9a4CrTU'
 
 # URL вебхука Битрикс24
-BITRIX_WEBHOOK_URL = "https://b24-7jrcyg.bitrix24.ru/rest/1/at06gb8ol8h2h6a1/"
+BITRIX_WEBHOOK_URL = "https://b24-kzukab.bitrix24.ru/rest/1/tc7r0dumyjir3ikh/"
 
 # Имя пользователя менеджера (для контакта с клиентами)
-manager_username = "@Bobo_76"
+manager_username = "@menej_tj"
 
 # Сопоставление полей в Битрикс24
 BITRIX_FIELDS = {
@@ -18,10 +18,10 @@ BITRIX_FIELDS = {
     "type": "TYPE_ID",
     "stage": "STAGE_ID",
     "price": "OPPORTUNITY",
-    "phone": "UF_CRM_1739701799",
-    "course": "UF_CRM_1739701903",
-    "tariff_name": "UF_CRM_1739701953",
-    "referral": "UF_CRM_1740017868"
+    "phone": "UF_CRM_1740629049",
+    "course": "UF_CRM_1740629005",
+    "tariff_name": "UF_CRM_1740628975",
+    "referral": "UF_CRM_1740629032"
 }
 courses = {
     "course1": {
