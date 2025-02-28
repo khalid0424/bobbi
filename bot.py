@@ -2,7 +2,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 from config import TOKEN, BITRIX_WEBHOOK_URL, manager_username, BITRIX_FIELDS, courses
-
+import random
 bot = telebot.TeleBot(TOKEN)
 
 user_states = {}
@@ -20,8 +20,8 @@ def create_courses_keyboard():
 def create_payment_method_keyboard(course_id):
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
-        InlineKeyboardButton("💳 Оплатить онлайн", callback_data=f"payment_online_{course_id}"),
-        InlineKeyboardButton("👨‍💼 Связаться с менеджером", url=f"https://t.me/{manager_username.replace('@', '')}"),
+        InlineKeyboardButton("💳 Онлайн", callback_data=f"payment_online_{course_id}"),
+        InlineKeyboardButton("👨‍💼 Консультация менеджера", callback_data=f"payment_manager_{course_id}"),
         InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses")
     )
     return keyboard
@@ -33,6 +33,12 @@ def create_tariffs_keyboard(course_id):
         keyboard.add(InlineKeyboardButton(button_text, callback_data=f"tariff_{course_id}_{tariff_id}"))
     keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
     return keyboard
+
+def get_random_manager(course_id):
+    """Функция для выбора случайного менеджера из списка ответственных за курс"""
+    if course_id in courses and "responsible_managers" in courses[course_id]:
+        return random.choice(courses[course_id]["responsible_managers"])
+    return {"name": "Менеджер", "bitrix_id": "1"} 
 
 @bot.message_handler(commands=["start"])
 def start_handler(message):
@@ -110,8 +116,10 @@ def course_callback(call):
         }
     
     user_states[user_id]["selected_course"] = course_id
-
     
+    # Назначаем случайного менеджера из списка ответственных
+    random_manager = get_random_manager(course_id)
+    user_states[user_id]["assigned_manager"] = random_manager
     
     bot.send_message(
         call.message.chat.id,
@@ -124,7 +132,6 @@ def payment_online_callback(call):
     user_id = call.from_user.id
     course_id = call.data.split("_")[2]
     
-    # Проверяем, существует ли курс с таким ID
     if course_id not in courses:
         bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
         return
@@ -187,26 +194,33 @@ def payment_manager_callback(call):
     
     course_name = courses[course_id]["name"]
     
-    bot.send_message(
-        call.message.chat.id,
-        f"Вы выбрали оплату через менеджера для курса «{course_name}».\n"
-        f"Наш менеджер свяжется с вами в ближайшее время.\n"
-        f"Если у вас есть вопросы, вы можете связаться с ним напрямую: {manager_username}"
-    )
+    if "assigned_manager" not in user_states[user_id]:
+        user_states[user_id]["assigned_manager"] = get_random_manager(course_id)
     
-    # Добавляем кнопку для возврата к выбору курсов
-    back_keyboard = InlineKeyboardMarkup(row_width=1)
-    back_keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+    responsible_manager_name = user_states[user_id]["assigned_manager"]["name"]
     
-    bot.send_message(
-        call.message.chat.id,
-        "Спасибо за интерес к нашему курсу!",
-        reply_markup=back_keyboard
-    )
-    
-    # Создаем сделку в Битрикс с дефолтным тарифом (или без тарифа)
     create_bitrix_deal(user_id, course_id, None, "Через менеджера")
-
+    
+    manager_chat_url = f"https://t.me/{manager_username.replace('@', '')}"
+    predefined_message = f"АссаламуАлейкум, господин {responsible_manager_name}, я хотел бы пройти и купить курс «{course_name}», пожалуйста, помогите мне..."
+    direct_chat_url = f"{manager_chat_url}?start={course_id}&text={requests.utils.quote(predefined_message)}"
+    
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Вы выбрали консультацию с менеджером для курса и оплату  для курса «{course_name}».\n"
+        f"Сейчас вы будете перенаправлены к менеджеру {responsible_manager_name}."
+    )
+    
+    redirect_keyboard = InlineKeyboardMarkup()
+    redirect_keyboard.add(InlineKeyboardButton("Перейти в чат", url=direct_chat_url))
+    redirect_keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+    bot.send_message(
+        call.message.chat.id,
+        "Нажмите на кнопку ниже, чтобы перейти в чат с менеджером:",
+        reply_markup=redirect_keyboard
+    )
+    
+    
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tariff_"))
 def tariff_callback(call):
     user_id = call.from_user.id
@@ -261,6 +275,12 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
         return
         
     course_name = courses[course_id]["name"]
+    
+    # Если менеджер еще не назначен, назначаем случайного
+    if "assigned_manager" not in user_states[user_id]:
+        user_states[user_id]["assigned_manager"] = get_random_manager(course_id)
+    
+    responsible_manager_id = user_states[user_id]["assigned_manager"]["bitrix_id"]
     
     # Получаем информацию о тарифе, если он указан
     tariff_name = "Не указан"
@@ -318,7 +338,8 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
                 BITRIX_FIELDS["course"]: course_name,
                 BITRIX_FIELDS["tariff_name"]: tariff_name,
                 BITRIX_FIELDS["referral"]: referrer if referrer else "Нет реферера",
-                BITRIX_FIELDS.get("payment_method", "UF_CRM_PAYMENT_METHOD"): payment_method
+                BITRIX_FIELDS.get("payment_method", "UF_CRM_PAYMENT_METHOD"): payment_method,
+                "ASSIGNED_BY_ID": responsible_manager_id  # Назначаем ответственного менеджера
             }
         }
 
