@@ -47,7 +47,6 @@ def start_handler(message):
     button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
     keyboard.add(button_phone)
 
-    # Сохраняем имя пользователя и referrer
     user_states[message.from_user.id] = {
         "referrer": referrer,
         "first_name": message.from_user.first_name,
@@ -207,19 +206,52 @@ def payment_manager_callback(call):
     
     bot.send_message(
         call.message.chat.id,
-        f"✅ Вы выбрали консультацию с менеджером для курса и оплату  для курса «{course_name}».\n"
-        f"Сейчас вы будете перенаправлены к менеджеру {responsible_manager_name}."
+        f"✅ Вы выбрали консультацию с менеджером для курса «{course_name}».\n"
+        f"Как вам удобно связаться:"
     )
     
     redirect_keyboard = InlineKeyboardMarkup()
     redirect_keyboard.add(InlineKeyboardButton("Перейти в чат", url=direct_chat_url))
+    redirect_keyboard.add(InlineKeyboardButton("📞 Получить звонок от менеджера", callback_data=f"call_request_{course_id}"))
     redirect_keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+
     bot.send_message(
         call.message.chat.id,
-        "Нажмите на кнопку ниже, чтобы перейти в чат с менеджером:",
+        "Выберите удобный для вас способ связи:",
         reply_markup=redirect_keyboard
     )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("call_request_"))
+def call_request_callback(call):
+    user_id = call.from_user.id
+    course_id = call.data.split("_")[2]
     
+    if course_id not in courses:
+        bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
+        return
+    
+    if user_id not in user_states or "phone" not in user_states[user_id]:
+        keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+        button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+        keyboard.add(button_phone)
+        
+        bot.send_message(
+            call.message.chat.id, 
+            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+            reply_markup=keyboard
+        )
+        return
+    
+    course_name = courses[course_id]["name"]
+    
+    # Создаем сделку в Битрикс с отметкой о запросе звонка
+    create_bitrix_deal(user_id, course_id, None, "Через менеджера", call_requested=True)
+    
+    bot.send_message(
+        call.message.chat.id,
+        f"📞 Спасибо за ваш запрос! Менеджер свяжется с вами в ближайшее время по номеру телефона, который вы предоставили.",
+        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+    )
     
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tariff_"))
 def tariff_callback(call):
@@ -270,7 +302,7 @@ def tariff_callback(call):
     # Создаем сделку в Битрикс
     create_bitrix_deal(user_id, course_id, tariff_id, "Онлайн")
 
-def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
+def create_bitrix_deal(user_id, course_id, tariff_id, payment_method, call_requested=False):
     if user_id not in user_states or "phone" not in user_states[user_id]:
         return
         
@@ -296,7 +328,6 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
         first_name = user_states[user_id].get("first_name", "")
         last_name = user_states[user_id].get("last_name", "")
         
-        # Формируем имя пользователя
         user_name = f"{first_name} {last_name}".strip()
         if not user_name:
             user_name = f"User {user_id}"
@@ -327,7 +358,7 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
             contact_create.raise_for_status()
             contact_id = contact_create.json().get("result")
 
-        # Формируем данные для сделки
+        
         deal_data = {
             "fields": {
                 BITRIX_FIELDS["title"]: f"🛒 Покупка курса - {course_name}",
@@ -339,7 +370,9 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method):
                 BITRIX_FIELDS["tariff_name"]: tariff_name,
                 BITRIX_FIELDS["referral"]: referrer if referrer else "Нет реферера",
                 BITRIX_FIELDS.get("payment_method", "UF_CRM_PAYMENT_METHOD"): payment_method,
-                "ASSIGNED_BY_ID": responsible_manager_id  # Назначаем ответственного менеджера
+                "ASSIGNED_BY_ID": responsible_manager_id,
+                # Добавляем новое поле для запроса звонка
+                BITRIX_FIELDS.get("call_requested"): "Пожалуйста, позвоните клиенту" if call_requested else ""
             }
         }
 

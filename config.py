@@ -4,10 +4,10 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
 
 # Токен Telegram бота
-TOKEN = '7531821089:AAFPz7CsBZ7S_OPQTiVW7aTT25bAZ96QL00'
+TOKEN = '8028992264:AAEMNsfOSuACUSFYXEP2Hw3FMMssI2wyPrM'
 
 # URL вебхука Битрикс24
-BITRIX_WEBHOOK_URL = "https://b24-kzukab.bitrix24.ru/rest/1/nh2jwi33nolk3xkx/"
+BITRIX_WEBHOOK_URL = "https://b24-kzukab.bitrix24.ru/rest/1/yia05gmzs3jbmpnk/"
 
 # Имя пользователя менеджера (для контакта с клиентами)
 manager_username = "@menej_tj"
@@ -21,7 +21,8 @@ BITRIX_FIELDS = {
     "phone": "UF_CRM_1740629049",
     "course": "UF_CRM_1740629005",
     "tariff_name": "UF_CRM_1740628975",
-    "referral": "UF_CRM_1740629032"
+    "referral": "UF_CRM_1740629032",
+    "call_requested": "UF_CRM_1740886001"
 }
 
 # Добавление 5 ответственных менеджеров для каждого курса с их Bitrix ID
