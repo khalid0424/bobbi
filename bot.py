@@ -1,6 +1,7 @@
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
+import re
 from config import TOKEN, BITRIX_WEBHOOK_URL, manager_username, BITRIX_FIELDS, courses
 import random
 bot = telebot.TeleBot(TOKEN)
@@ -50,12 +51,13 @@ def start_handler(message):
     user_states[message.from_user.id] = {
         "referrer": referrer,
         "first_name": message.from_user.first_name,
-        "last_name": message.from_user.last_name if message.from_user.last_name else ""
+        "last_name": message.from_user.last_name if message.from_user.last_name else "",
+        "waiting_for_phone": True
     }
     
     bot.send_message(
         message.chat.id,
-        "👋 АссаламуАъалкум! Мы предлагаем курсы по работе на маркетплейсах. Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+        "👋 АссаламуАъалкум! Мы предлагаем курсы по работе на маркетплейсах. Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
         reply_markup=keyboard
     )
 
@@ -74,6 +76,7 @@ def contact_handler(message):
         }
     
     user_states[user_id]["phone"] = phone
+    user_states[user_id]["waiting_for_phone"] = False
 
     bot.send_message(
         message.chat.id,
@@ -81,6 +84,60 @@ def contact_handler(message):
         reply_markup=telebot.types.ReplyKeyboardRemove()
     )
 
+    bot.send_message(
+        message.chat.id,
+        "📚 Выберите интересующий вас курс:",
+        reply_markup=create_courses_keyboard()
+    )
+
+@bot.message_handler(func=lambda message: message.from_user.id in user_states and user_states[message.from_user.id].get("waiting_for_phone", False))
+def manual_phone_handler(message):
+    user_id = message.from_user.id
+    
+    # Очищаем номер телефона от всего, кроме цифр
+    phone_text = re.sub(r'\D', '', message.text)
+    
+    # Проверяем, является ли введенный текст номером телефона
+    if not phone_text:
+        bot.send_message(
+            message.chat.id,
+            "⚠️ Пожалуйста, введите корректный номер телефона, содержащий только цифры."
+        )
+        return
+    
+    # Проверяем длину номера телефона (обычно от 10 до 15 цифр)
+    if len(phone_text) < 10 or len(phone_text) > 15:
+        bot.send_message(
+            message.chat.id,
+            "⚠️ Пожалуйста, введите корректный номер телефона в международном формате."
+        )
+        return
+    
+    # Форматируем номер телефона в международном формате
+    if not phone_text.startswith("7") and not phone_text.startswith("8"):
+        phone = f"+{phone_text}"
+    elif phone_text.startswith("8"):
+        phone = f"+7{phone_text[1:]}"
+    else:
+        phone = f"+{phone_text}"
+    
+    # Сохраняем номер телефона
+    if user_id not in user_states:
+        user_states[user_id] = {
+            "first_name": message.from_user.first_name,
+            "last_name": message.from_user.last_name if message.from_user.last_name else "",
+            "referrer": None
+        }
+    
+    user_states[user_id]["phone"] = phone
+    user_states[user_id]["waiting_for_phone"] = False
+    
+    bot.send_message(
+        message.chat.id,
+        "✅ Номер принят!", 
+        reply_markup=telebot.types.ReplyKeyboardRemove()
+    )
+    
     bot.send_message(
         message.chat.id,
         "📚 Выберите интересующий вас курс:",
@@ -143,9 +200,11 @@ def payment_online_callback(call):
         button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
         keyboard.add(button_phone)
         
+        user_states[user_id]["waiting_for_phone"] = True
+        
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
             reply_markup=keyboard
         )
         return
@@ -184,9 +243,11 @@ def payment_manager_callback(call):
         button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
         keyboard.add(button_phone)
         
+        user_states[user_id]["waiting_for_phone"] = True
+        
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
             reply_markup=keyboard
         )
         return
@@ -235,9 +296,11 @@ def call_request_callback(call):
         button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
         keyboard.add(button_phone)
         
+        user_states[user_id]["waiting_for_phone"] = True
+        
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
             reply_markup=keyboard
         )
         return
@@ -271,9 +334,11 @@ def tariff_callback(call):
         button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
         keyboard.add(button_phone)
         
+        user_states[user_id]["waiting_for_phone"] = True
+        
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить:",
+            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
             reply_markup=keyboard
         )
         return
