@@ -2,8 +2,11 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 import re
-from config import TOKEN, BITRIX_WEBHOOK_URL, manager_username, BITRIX_FIELDS, courses
+from config import TOKEN, BITRIX_WEBHOOK_URL, manager_username, BITRIX_FIELDS, courses ,BITRIX_DEAL_SETTINGS  
+from text import MESSAGES, BUTTONS
 import random
+
+
 bot = telebot.TeleBot(TOKEN)
 
 user_states = {}
@@ -21,9 +24,9 @@ def create_courses_keyboard():
 def create_payment_method_keyboard(course_id):
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
-        InlineKeyboardButton("💳 Онлайн", callback_data=f"payment_online_{course_id}"),
-        InlineKeyboardButton("👨‍💼 Консультация менеджера", callback_data=f"payment_manager_{course_id}"),
-        InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses")
+        InlineKeyboardButton(BUTTONS["online_payment"], callback_data=f"payment_online_{course_id}"),
+        InlineKeyboardButton(BUTTONS["manager_consultation"], callback_data=f"payment_manager_{course_id}"),
+        InlineKeyboardButton(BUTTONS["back_to_courses"], callback_data="back_to_courses")
     )
     return keyboard
 
@@ -32,7 +35,7 @@ def create_tariffs_keyboard(course_id):
     for tariff_id, tariff_info in courses[course_id]["tariffs"].items():
         button_text = f"{tariff_info['name']} "
         keyboard.add(InlineKeyboardButton(button_text, callback_data=f"tariff_{course_id}_{tariff_id}"))
-    keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+    keyboard.add(InlineKeyboardButton(BUTTONS["back_to_courses"], callback_data="back_to_courses"))
     return keyboard
 
 def get_random_manager(course_id):
@@ -45,7 +48,7 @@ def get_random_manager(course_id):
 def start_handler(message):
     referrer = message.text.split(" ")[-1] if " " in message.text else None
     keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-    button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+    button_phone = telebot.types.KeyboardButton(text=BUTTONS["send_phone"], request_contact=True)
     keyboard.add(button_phone)
 
     user_states[message.from_user.id] = {
@@ -57,7 +60,7 @@ def start_handler(message):
     
     bot.send_message(
         message.chat.id,
-        "👋 АссаламуАъалкум! Мы предлагаем курсы по работе на маркетплейсах. Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
+        MESSAGES["welcome"],
         reply_markup=keyboard
     )
 
@@ -80,13 +83,13 @@ def contact_handler(message):
 
     bot.send_message(
         message.chat.id,
-        "✅ Номер принят!", 
+        MESSAGES["phone_accepted"], 
         reply_markup=telebot.types.ReplyKeyboardRemove()
     )
 
     bot.send_message(
         message.chat.id,
-        "📚 Выберите интересующий вас курс:",
+        MESSAGES["choose_course"],
         reply_markup=create_courses_keyboard()
     )
 
@@ -101,7 +104,7 @@ def manual_phone_handler(message):
     if not phone_text:
         bot.send_message(
             message.chat.id,
-            "⚠️ Пожалуйста, введите корректный номер телефона, содержащий только цифры."
+            MESSAGES["phone_invalid"]
         )
         return
     
@@ -109,7 +112,7 @@ def manual_phone_handler(message):
     if len(phone_text) < 10 or len(phone_text) > 15:
         bot.send_message(
             message.chat.id,
-            "⚠️ Пожалуйста, введите корректный номер телефона в международном формате."
+            MESSAGES["phone_invalid_length"]
         )
         return
     
@@ -134,13 +137,13 @@ def manual_phone_handler(message):
     
     bot.send_message(
         message.chat.id,
-        "✅ Номер принят!", 
+        MESSAGES["phone_accepted"], 
         reply_markup=telebot.types.ReplyKeyboardRemove()
     )
     
     bot.send_message(
         message.chat.id,
-        "📚 Выберите интересующий вас курс:",
+        MESSAGES["choose_course"],
         reply_markup=create_courses_keyboard()
     )
 
@@ -148,7 +151,7 @@ def manual_phone_handler(message):
 @bot.callback_query_handler(func=lambda call: call.data == "back_to_courses")
 def back_to_courses_callback(call):
     bot.edit_message_text(
-        "📚 Пожалуйста, выберите интересующий вас курс:",
+        MESSAGES["choose_course"],
         call.message.chat.id,
         call.message.message_id,
         reply_markup=create_courses_keyboard()
@@ -160,7 +163,7 @@ def course_callback(call):
     course_id = call.data.split("_")[1]
     
     if course_id not in courses:
-        bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
+        bot.answer_callback_query(call.id, MESSAGES["course_not_found"])
         return
         
     course_name = courses[course_id]["name"]
@@ -179,7 +182,7 @@ def course_callback(call):
     
     bot.send_message(
         call.message.chat.id,
-        "Выберите способ оплаты:",
+        MESSAGES["choose_payment"],
         reply_markup=create_payment_method_keyboard(course_id)
     )
 
@@ -189,7 +192,7 @@ def payment_online_callback(call):
     course_id = call.data.split("_")[2]
     
     if course_id not in courses:
-        bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
+        bot.answer_callback_query(call.id, MESSAGES["course_not_found"])
         return
         
     course_name = courses[course_id]["name"]
@@ -197,14 +200,14 @@ def payment_online_callback(call):
     # Проверяем, есть ли номер телефона пользователя
     if user_id not in user_states or "phone" not in user_states[user_id]:
         keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-        button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+        button_phone = telebot.types.KeyboardButton(text=BUTTONS["send_phone"], request_contact=True)
         keyboard.add(button_phone)
         
         user_states[user_id]["waiting_for_phone"] = True
         
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
+            MESSAGES["phone_required"],
             reply_markup=keyboard
         )
         return
@@ -214,18 +217,18 @@ def payment_online_callback(call):
             bot.send_photo(
                 call.message.chat.id,
                 photo,
-                caption=f"🎟 Тарифы курса {course_name}:"
+                caption=MESSAGES["tariffs_title"].format(course_name=course_name)
             )
     except Exception as e:
         bot.send_message(
             call.message.chat.id,
-            f"🎟 Тарифы курса {course_name}:"
+            MESSAGES["tariffs_title"].format(course_name=course_name)
         )
     
     # Отправляем список тарифов
     bot.send_message(
         call.message.chat.id,
-        "Выберите подходящий тариф:",
+        MESSAGES["choose_tariff"],
         reply_markup=create_tariffs_keyboard(course_id)
     )
 
@@ -235,19 +238,19 @@ def payment_manager_callback(call):
     course_id = call.data.split("_")[2]
     
     if course_id not in courses:
-        bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
+        bot.answer_callback_query(call.id, MESSAGES["course_not_found"])
         return
         
     if user_id not in user_states or "phone" not in user_states[user_id]:
         keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-        button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+        button_phone = telebot.types.KeyboardButton(text=BUTTONS["send_phone"], request_contact=True)
         keyboard.add(button_phone)
         
         user_states[user_id]["waiting_for_phone"] = True
         
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
+            MESSAGES["phone_required"],
             reply_markup=keyboard
         )
         return
@@ -262,23 +265,25 @@ def payment_manager_callback(call):
     create_bitrix_deal(user_id, course_id, None, "Через менеджера")
     
     manager_chat_url = f"https://t.me/{manager_username.replace('@', '')}"
-    predefined_message = f"АссаламуАлейкум, господин {responsible_manager_name}, я хотел бы пройти и купить курс «{course_name}», пожалуйста, помогите мне..."
+    predefined_message = MESSAGES["manager_predefined_message"].format(
+        manager_name=responsible_manager_name,
+        course_name=course_name
+    )
     direct_chat_url = f"{manager_chat_url}?start={course_id}&text={requests.utils.quote(predefined_message)}"
     
     bot.send_message(
         call.message.chat.id,
-        f"✅ Вы выбрали консультацию с менеджером для курса «{course_name}».\n"
-        f"Как вам удобно связаться:"
+        MESSAGES["manager_consultation"].format(course_name=course_name)
     )
     
     redirect_keyboard = InlineKeyboardMarkup()
-    redirect_keyboard.add(InlineKeyboardButton("Перейти в чат", url=direct_chat_url))
-    redirect_keyboard.add(InlineKeyboardButton("📞 Получить звонок от менеджера", callback_data=f"call_request_{course_id}"))
-    redirect_keyboard.add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+    redirect_keyboard.add(InlineKeyboardButton(BUTTONS["chat_with_manager"], url=direct_chat_url))
+    redirect_keyboard.add(InlineKeyboardButton(BUTTONS["request_call"], callback_data=f"call_request_{course_id}"))
+    redirect_keyboard.add(InlineKeyboardButton(BUTTONS["back_to_courses"], callback_data="back_to_courses"))
 
     bot.send_message(
         call.message.chat.id,
-        "Выберите удобный для вас способ связи:",
+        MESSAGES["choose_contact_method"],
         reply_markup=redirect_keyboard
     )
 
@@ -288,19 +293,19 @@ def call_request_callback(call):
     course_id = call.data.split("_")[2]
     
     if course_id not in courses:
-        bot.answer_callback_query(call.id, "Курс не найден. Попробуйте выбрать другой.")
+        bot.answer_callback_query(call.id, MESSAGES["course_not_found"])
         return
     
     if user_id not in user_states or "phone" not in user_states[user_id]:
         keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-        button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+        button_phone = telebot.types.KeyboardButton(text=BUTTONS["send_phone"], request_contact=True)
         keyboard.add(button_phone)
         
         user_states[user_id]["waiting_for_phone"] = True
         
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
+            MESSAGES["phone_required"],
             reply_markup=keyboard
         )
         return
@@ -312,8 +317,8 @@ def call_request_callback(call):
     
     bot.send_message(
         call.message.chat.id,
-        f"📞 Спасибо за ваш запрос! Менеджер свяжется с вами в ближайшее время по номеру телефона, который вы предоставили.",
-        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses"))
+        MESSAGES["call_request_success"],
+        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton(BUTTONS["back_to_courses"], callback_data="back_to_courses"))
     )
     
 @bot.callback_query_handler(func=lambda call: call.data.startswith("tariff_"))
@@ -322,7 +327,7 @@ def tariff_callback(call):
     _, course_id, tariff_id = call.data.split("_")
     
     if course_id not in courses or tariff_id not in courses[course_id]["tariffs"]:
-        bot.answer_callback_query(call.id, "Тариф не найден. Попробуйте выбрать другой.")
+        bot.answer_callback_query(call.id, MESSAGES["tariff_not_found"])
         return
     
     course_name = courses[course_id]["name"]
@@ -331,14 +336,14 @@ def tariff_callback(call):
     # Проверяем, есть ли номер телефона пользователя
     if user_id not in user_states or "phone" not in user_states[user_id]:
         keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-        button_phone = telebot.types.KeyboardButton(text="📱 Отправьте свой номер телефона", request_contact=True)
+        button_phone = telebot.types.KeyboardButton(text=BUTTONS["send_phone"], request_contact=True)
         keyboard.add(button_phone)
         
         user_states[user_id]["waiting_for_phone"] = True
         
         bot.send_message(
             call.message.chat.id, 
-            "⚠️ Пожалуйста, отправьте свой номер телефона чтобы продолжить (можете нажать на кнопку или просто написать номер):",
+            MESSAGES["phone_required"],
             reply_markup=keyboard
         )
         return
@@ -347,20 +352,23 @@ def tariff_callback(call):
     
     bot.send_message(
         call.message.chat.id,
-        f"🎓 Тариф: {tariff_info['name']}\n💰 Стоимость: {tariff_info['price']} руб.\n\n"
-        f"{tariff_info['info']}\n\nДля оплаты перейдите по ссылке ниже."
+        MESSAGES["tariff_details"].format(
+            tariff_name=tariff_info['name'],
+            tariff_price=tariff_info['price'],
+            tariff_info=tariff_info['info']
+        )
     )
     
     # Создаем клавиатуру только с кнопкой оплаты
     payment_keyboard = InlineKeyboardMarkup(row_width=1)
     payment_keyboard.add(
-        InlineKeyboardButton("💳 Оплатить онлайн", url=tariff_info["link"]),
-        InlineKeyboardButton("◀️ Назад к курсам", callback_data="back_to_courses")
+        InlineKeyboardButton(BUTTONS["pay_online"], url=tariff_info["link"]),
+        InlineKeyboardButton(BUTTONS["back_to_courses"], callback_data="back_to_courses")
     )
     
     bot.send_message(
         call.message.chat.id,
-        "↘️🔽🔽🔽🔽🔽🔽↙️",
+        MESSAGES["payment_buttons"],
         reply_markup=payment_keyboard
     )
     
@@ -422,22 +430,21 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method, call_reque
             )
             contact_create.raise_for_status()
             contact_id = contact_create.json().get("result")
-
         
         deal_data = {
             "fields": {
-                BITRIX_FIELDS["title"]: f"🛒 Покупка курса - {course_name}",
-                BITRIX_FIELDS["type"]: "GOODS",
-                BITRIX_FIELDS["stage"]: "NEW",
+                BITRIX_FIELDS["title"]: f"{BITRIX_DEAL_SETTINGS['title_prefix']}{course_name}",
+                BITRIX_FIELDS["type"]: BITRIX_DEAL_SETTINGS["deal_type"],
+                BITRIX_FIELDS["stage"]: BITRIX_DEAL_SETTINGS["new_stage"],
                 BITRIX_FIELDS["price"]: tariff_price,
                 "CONTACT_ID": contact_id,
                 BITRIX_FIELDS["course"]: course_name,
                 BITRIX_FIELDS["tariff_name"]: tariff_name,
-                BITRIX_FIELDS["referral"]: referrer if referrer else "Нет реферера",
+                BITRIX_FIELDS["referral"]: referrer if referrer else BITRIX_DEAL_SETTINGS["no_referrer_text"],
                 BITRIX_FIELDS.get("payment_method", "UF_CRM_PAYMENT_METHOD"): payment_method,
                 "ASSIGNED_BY_ID": responsible_manager_id,
                 # Добавляем новое поле для запроса звонка
-                BITRIX_FIELDS.get("call_requested"): "Пожалуйста, позвоните клиенту" if call_requested else ""
+                BITRIX_FIELDS.get("call_requested"): BITRIX_DEAL_SETTINGS["call_request_text"] if call_requested else BITRIX_DEAL_SETTINGS["no_call_request_text"]
             }
         }
 
@@ -450,12 +457,12 @@ def create_bitrix_deal(user_id, course_id, tariff_id, payment_method, call_reque
     except requests.RequestException as e:
         bot.send_message(
             user_id, 
-            f"❌ Ошибка связи с сервером. Попробуйте позже. Обратитесь к поддержке: {manager_username}"
+            MESSAGES["server_error"].format(manager_username=manager_username)
         )
     except Exception as e:
         bot.send_message(
             user_id, 
-            f"⚠️ Произошла ошибка. Обратитесь к поддержке: {manager_username}"
+            MESSAGES["general_error"].format(manager_username=manager_username)
         )
 
 if __name__ == "__main__":

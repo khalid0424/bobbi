@@ -132,3 +132,11 @@ courses = {
         }
     }
 }
+BITRIX_DEAL_SETTINGS = {
+    "title_prefix": "🛒 Покупка курса - ",
+    "deal_type": "GOODS",
+    "new_stage": "NEW",
+    "no_referrer_text": "Нет реферера",
+    "call_request_text": "Пожалуйста, позвоните клиенту",
+    "no_call_request_text": ""
+}
