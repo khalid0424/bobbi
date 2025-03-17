@@ -6,7 +6,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN = '7392740953:AAGE4PBkkEo3Libo7S0lfCx0e1bmezDkXtI'
 
 # URL вебхука Битрикс24
-BITRIX_WEBHOOK_URL = "https://b24-01y7lm.bitrix24.ru/rest/1/sa6qhxc31fvic1a0/"
+BITRIX_WEBHOOK_URL = "https://b24-01y7lm.bitrix24.ru/rest/1/540cdz5m25lntnyg/"
 
 # Имя пользователя менеджера (для контакта с клиентами)
 manager_username = "@menej_tj"
