@@ -3,10 +3,10 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
 
 # Токен Telegram бота
-TOKEN = '7392740953:AAGE4PBkkEo3Libo7S0lfCx0e1bmezDkXtI'
+TOKEN = '7392740953:AAG914fyU644VZikEAzYia-wtFzS7QHznJM'
 
 # URL вебхука Битрикс24
-BITRIX_WEBHOOK_URL = "https://b24-kzukab.bitrix24.ru/rest/1/p6lvai0fm410tjw1/"
+BITRIX_WEBHOOK_URL = "https://b24-bus69m.bitrix24.ru/rest/1/rwm6j0d27ue65igq/"
 
 # Имя пользователя менеджера (для контакта с клиентами)
 manager_username = "@menej_tj"
